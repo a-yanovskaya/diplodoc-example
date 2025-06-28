@@ -4,60 +4,37 @@ on:
   workflow_dispatch:
   pull_request:
     types: [closed]
-    branches:
+    branches:    
       - main
 
 jobs:
   check-env:
     runs-on: ubuntu-latest
     steps:
-      - name: "Check if DIPLODOC_STORAGE_BUCKET variable exists"
+      - name: "Check is DIPLODOC_STORAGE_BUCKET secret exists"
         env:
-          storage_bucket: ${{ vars.DIPLODOC_STORAGE_BUCKET }}
-        if: ${{ env.storage_bucket == '' }}
-        run: |
-          echo "::error:: The variable \"DIPLODOC_STORAGE_BUCKET\" is missing; check your secrets and variables or visit https://diplodoc.com/quickstart"
-          exit 1
-
+          storage-bucket: ${{ vars.DIPLODOC_STORAGE_BUCKET }}
+        if: ${{ env.storage-bucket == '' }}
+        run: 'echo "::error:: The variable \"DIPLODOC_STORAGE_BUCKET\" has not been made; please check that all necessary secrets and variables are installed or follow the link https://diplodoc.com/quickstart" && exit 1'
   build:
     needs: check-env
     if: ${{ github.repository != 'diplodoc-platform/documentation-template' }}
     runs-on: ubuntu-latest
     permissions: write-all
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v3
-
-      - name: Setup Node.js 20.x
-        uses: actions/setup-node@v3
+      - name: Build
+        uses: diplodoc-platform/docs-build-action@v3
         with:
-          node-version: 20
-
-      - name: Install Diplodoc CLI globally
-        run: npm install -g @diplodoc/cli@latest
-
-      - name: Build documentation with yfm
-        run: yfm build ./docs -o ./_docs-build
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-output-md
-          path: ./_docs-build
-          retention-days: 1
-          if-no-files-found: warn
-
+          revision: "${{ github.sha }}"
+          src-root: "./docs"
   upload:
     needs: build
     runs-on: ubuntu-latest
     permissions: write-all
     steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@v3
-        with:
-          name: build-output-md
-
-      - name: Upload to storage
+      - name: Upload
         uses: diplodoc-platform/docs-upload-action@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -66,7 +43,6 @@ jobs:
           storage-bucket: ${{ vars.DIPLODOC_STORAGE_BUCKET }}
           storage-access-key-id: ${{ secrets.DIPLODOC_ACCESS_KEY_ID }}
           storage-secret-access-key: ${{ secrets.DIPLODOC_SECRET_ACCESS_KEY }}
-
   release:
     needs: upload
     runs-on: ubuntu-latest
@@ -74,7 +50,7 @@ jobs:
       - name: Release
         uses: diplodoc-platform/docs-release-action@v2
         with:
-          revision: ${{ github.sha }}
+          revision: "${{ github.sha }}"
           storage-bucket: ${{ vars.DIPLODOC_STORAGE_BUCKET }}
           storage-access-key-id: ${{ secrets.DIPLODOC_ACCESS_KEY_ID }}
           storage-secret-access-key: ${{ secrets.DIPLODOC_SECRET_ACCESS_KEY }}
