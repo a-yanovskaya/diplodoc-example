@@ -15,29 +15,54 @@ jobs:
         env:
           storage-bucket: ${{ vars.DIPLODOC_STORAGE_BUCKET }}
         if: ${{ env.storage-bucket == '' }}
-        run: 'echo "::error:: The variable \"DIPLODOC_STORAGE_BUCKET\" has not been made; please check that all necessary secrets and variables are installed or follow the link https://diplodoc.com/quickstart" && exit 1'
+        run: |
+          echo "::error:: The variable \"DIPLODOC_STORAGE_BUCKET\" has not been made; please check that all necessary secrets and variables are installed or follow the link https://diplodoc.com/quickstart"
+          exit 1
+
   build:
     needs: check-env
     if: ${{ github.repository != 'diplodoc-platform/documentation-template' }}
     runs-on: ubuntu-latest
     permissions: write-all
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v3
-      - name: Use Node.js 20.18.1
+
+      - name: Set up Node.js 20.18.1
         uses: actions/setup-node@v3
         with:
           node-version: 20.18.1
-      - name: Install dependencies
+
+      - name: Install Diplodoc CLI
         run: npm install -g @diplodoc/cli@latest
-      - name: Build docs
-        run: yfm build ./docs --output ./_docs-build
+
+      - name: Build documentation
+        run: yfm build ./docs -o ./_docs-build
+
+      - name: Check that _docs-build exists
+        run: |
+          if [ ! -d "./_docs-build" ]; then
+            echo "::error:: Build output folder '_docs-build' not found. Build might have failed."
+            exit 1
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output-md
+          include-hidden-files: true
+          path: ./_docs-build
+          retention-days: 1
+          if-no-files-found: error
+          compression-level: 6
+          overwrite: false
+
   upload:
     needs: build
     runs-on: ubuntu-latest
     permissions: write-all
     steps:
-      - name: Upload
+      - name: Upload to storage
         uses: diplodoc-platform/docs-upload-action@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -46,6 +71,7 @@ jobs:
           storage-bucket: ${{ vars.DIPLODOC_STORAGE_BUCKET }}
           storage-access-key-id: ${{ secrets.DIPLODOC_ACCESS_KEY_ID }}
           storage-secret-access-key: ${{ secrets.DIPLODOC_SECRET_ACCESS_KEY }}
+
   release:
     needs: upload
     runs-on: ubuntu-latest
