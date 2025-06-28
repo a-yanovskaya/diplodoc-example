@@ -28,11 +28,10 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 20.18.1
-      - name: Build
-        uses: diplodoc-platform/docs-build-action@v3
-        with:
-          revision: "${{ github.sha }}"
-          src-root: "./docs"
+      - name: Install dependencies
+        run: npm install -g @diplodoc/cli@latest
+      - name: Build docs
+        run: yfm build ./docs --output ./_docs-build
   upload:
     needs: build
     runs-on: ubuntu-latest
