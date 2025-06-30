@@ -8,3 +8,7 @@ links:
     href: anotherpage.md
   - title: Подраздел на главной странице
     href: sub-section/
+  - title: documentation
+    links:
+  - title: openapi
+    href: openapi/
